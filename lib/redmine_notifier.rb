@@ -16,19 +16,23 @@ module RedmineNotifier
     def call
       primed = false
       feed = Feedzirra::Feed.fetch_and_parse(@url)
-
+      puts "#{Time.now} - Beginning notifier..."
+      puts "#{Time.now} - Configuration: Update #{options[:delay]} seconds (0 means once)."
+      puts "#{Time.now} - Configuration: URL: #{@url}"
+      puts "#{Time.now} - Configuration: Notify in updates Newer than: #{options[:start_at].localtime} (at start)"
       begin
-        sleep(options[:delay]) if primed
-        puts "#{Time.now} - Checking feed #{@url}..."
+        puts "#{Time.now} - Checking feed..."
         if !primed || feed.updated?
           entries = primed ? feed.new_entries : feed.entries.select {|e| e.published >= options[:start_at] }
+          puts "#{Time.now} - New Entries found: #{entries.count}"
           entries.each do |entry|
             `terminal-notifier -group 'redmine-notifier' -title "#{entry.title.gsub('"', '\"')}" -subtitle "#{entry.published.localtime.strftime('%a, %b %e, %Y %l:%M%P')}" -message "#{entry.author}" -open "#{entry.url}"`
             sleep(2)
           end
-          feed = Feedzirra::Feed.update(feed) unless primed
           primed = true
         end
+        sleep(options[:delay])
+        feed = Feedzirra::Feed.update(feed)
       end until options[:delay] == 0
     end
 
