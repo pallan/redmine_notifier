@@ -66,9 +66,13 @@ module RedmineNotifier
         end
       end.parse!(args)
 
+      # if the URL was loaded from the dotfile and none was supplied
+      # we don't want to overwrite it - pa
+      url = args.pop
+      options[:url] = url unless url.nil?
+
       options[:delay]     ||= 0
       options[:start_at]  ||= Time.now
-      options[:url]       = args.pop
     end
 
   end
