@@ -2,6 +2,7 @@ require "redmine_notifier/version"
 require 'feedzirra'
 require 'optparse'
 require 'optparse/time'
+require 'yaml'
 
 module RedmineNotifier
 
@@ -9,17 +10,18 @@ module RedmineNotifier
     attr_accessor :options
 
     def initialize(*args)
-      @options = {}
+      @options = load_options
       parse_argv(*args)
     end
 
     def call
-      primed = false
-      feed = Feedzirra::Feed.fetch_and_parse(@url)
       puts "#{Time.now} - Beginning notifier..."
       puts "#{Time.now} - Configuration: Update #{options[:delay]} seconds (0 means once)."
-      puts "#{Time.now} - Configuration: URL: #{@url}"
+      puts "#{Time.now} - Configuration: URL: #{options[:url]}"
       puts "#{Time.now} - Configuration: Notify in updates Newer than: #{options[:start_at].localtime} (at start)"
+
+      primed = false
+      feed = Feedzirra::Feed.fetch_and_parse(options[:url])
       begin
         puts "#{Time.now} - Checking feed..."
         if !primed || feed.updated?
@@ -31,12 +33,27 @@ module RedmineNotifier
           end
           primed = true
         end
+        write_options
         sleep(options[:delay])
         feed = Feedzirra::Feed.update(feed)
       end until options[:delay] == 0
     end
 
     private
+
+    def options_file_path
+      File.expand_path('.redmine-notifier', '~')
+    end
+
+    def load_options
+      File.exists?(options_file_path) ? YAML.load(File.read(options_file_path)) : {}
+    end
+
+    def write_options
+      File.open(options_file_path, 'w+') do |f|
+        f.write YAML.dump(options.merge(start_at: Time.now))
+      end
+    end
 
     def parse_argv(*args)
       OptionParser.new do |opts|
@@ -49,9 +66,9 @@ module RedmineNotifier
         end
       end.parse!(args)
 
-      options[:delay] ||= 0
-      options[:start_at] ||= Time.now
-      @url = args.pop
+      options[:delay]     ||= 0
+      options[:start_at]  ||= Time.now
+      options[:url]       = args.pop
     end
 
   end
