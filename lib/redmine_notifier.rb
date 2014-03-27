@@ -20,22 +20,21 @@ module RedmineNotifier
       puts "#{Time.now} - Configuration: URL: #{options[:url]}"
       puts "#{Time.now} - Configuration: Notify in updates Newer than: #{options[:start_at].localtime} (at start)"
 
-      primed = false
-      feed = Feedzirra::Feed.fetch_and_parse(options[:url])
+      last_checked = options[:start_at]
       begin
+        feed = Feedzirra::Feed.fetch_and_parse(options[:url])
         puts "#{Time.now} - Checking feed..."
-        if !primed || feed.updated?
-          entries = primed ? feed.new_entries : feed.entries.select {|e| e.published >= options[:start_at] }
-          puts "#{Time.now} - New Entries found: #{entries.count}"
-          entries.each do |entry|
-            `terminal-notifier -group 'redmine-notifier' -title "#{entry.title.gsub('"', '\"')}" -subtitle "#{entry.published.localtime.strftime('%a, %b %e, %Y %l:%M%P')}" -message "#{entry.author}" -open "#{entry.url}"`
-            sleep(2)
-          end
-          primed = true
+        entries = feed.entries.select {|e| e.published >= last_checked }
+        last_checked = Time.now
+        puts "#{Time.now} - New Entries found: #{feed.new_entries.count}"
+        puts "#{Time.now}    #{entries.map(&:id).join("\n    ")}"
+        entries.each do |entry|
+          `terminal-notifier -group 'redmine-notifier' -title "#{entry.title.gsub('"', '\"')}" -subtitle "#{entry.published.localtime.strftime('%a, %b %e, %Y %l:%M%P')}" -message "#{entry.author}" -open "#{entry.url}"`
+          puts "#{Time.now}   - Sending notification for: #{entry.title} #{entry.published}"
+          sleep(2)
         end
         write_options
         sleep(options[:delay])
-        feed = Feedzirra::Feed.update(feed)
       end until options[:delay] == 0
     end
 
